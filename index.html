@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Templated Day-Based To-Do</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif; background-color: #e9e9e9; color: #333;
+            display: flex; min-height: 100vh; margin: 0; overflow-x: hidden;
+        }
+        .app-wrapper {
+            display: flex; width: 100%; max-width: 1300px; /* Wider for templates */
+            margin: 20px auto; background-color: #f7f7f7; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;
+        }
+        #leftPanel { /* Combined sidebar for Days and Templates */
+            width: 280px; background-color: #f0f0f0; padding: 15px;
+            border-right: 1px solid #ddd; display: flex; flex-direction: column;
+            height: calc(100vh - 40px); max-height: calc(100vh - 40px);
+        }
+        #leftPanel h2 {
+            margin-top: 0; font-size: 1.2em; color: #444;
+            border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 10px;
+        }
+        .scrollable-list-container { flex-grow: 1; overflow-y: auto; margin-bottom: 15px;}
+        .day-list, .template-list { list-style-type: none; padding: 0; margin: 0; }
+        .list-item {
+            padding: 10px 8px; margin-bottom: 5px; border-radius: 4px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.95em; border: 1px solid transparent;
+        }
+        .list-item:hover { background-color: #e0e0e0; }
+        .list-item.selected { background-color: #5cb85c; color: white; font-weight: bold; border-color: #4cae4c; }
+        .list-item .item-name-display { flex-grow: 1; }
+        .list-item .item-actions span { margin-left: 8px; opacity: 0.7; }
+        .list-item .item-actions span:hover { opacity: 1; }
+        .list-item.selected .item-actions span { color: white !important; }
+        .template-list .list-item button { /* Apply button for templates */
+            font-size: 0.8em; padding: 3px 6px; margin-left: 5px;
+            background-color: #5bc0de; color: white; border: none; border-radius: 3px;
+        }
+        .template-list .list-item.selected button { background-color: #46b8da; }
+
+
+        .form-section { margin-top: 10px; display: flex; gap: 5px; }
+        .form-section input[type="text"] { flex-grow: 1; padding: 8px; border-radius: 3px; border: 1px solid #ccc;}
+        .form-section button { padding: 8px 10px; font-size: 0.9em; background-color: #337ab7; color:white; border:none; border-radius: 3px;}
+
+        #templateManagementArea { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;}
+        #createTemplateFromDayBtn { width: 100%; margin-top:10px; background-color: #f0ad4e; }
+
+
+        .app-container { /* Main task area */
+            flex-grow: 1; background-color: white; padding: 20px;
+            display: flex; flex-direction: column;
+            height: calc(100vh - 40px); max-height: calc(100vh - 40px);
+        }
+        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; flex-shrink: 0; }
+        .header-container h1 { margin: 0; font-size: 1.5em; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif; }
+        .net-points-display { font-size: 1.8em; /* Slightly smaller for Day Points */ font-weight: bold; color: #28a745; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;}
+        .add-top-task-form { display: flex; margin-bottom: 10px; gap: 10px; align-items: center; flex-shrink: 0;}
+        .add-top-task-form input[type="text"] { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }
+        .add-top-task-form input[type="number"] { width: 70px; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }
+        .add-top-task-form button { padding: 8px 15px; background-color: #5cb85c; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.9em;}
+        .add-top-task-form button:hover { background-color: #4cae4c; }
+        .task-list-header { font-weight: bold; padding: 8px 0px 8px 50px; border-bottom: 1px solid #ddd; margin-bottom: 5px; font-size: 0.9em; color: #555; flex-shrink: 0;}
+        #taskListContainer { overflow-y: auto; flex-grow: 1; }
+        .task-item-container {} .task-item-container:last-child { border-bottom: none; }
+        .task-row { display: flex; align-items: center; padding: 5px 5px; gap: 6px; min-height: 28px; border-bottom: 1px solid #f0f0f0; font-size: var(--base-font-size-for-row, 0.75em); }
+        .task-row:hover { background-color: #f9f9f9; }
+        .task-row.level-0 { --base-font-size-for-row: 1em; } .task-row.level-1 { --base-font-size-for-row: 0.92em; } .task-row.level-2 { --base-font-size-for-row: 0.85em; } .task-row.level-3 { --base-font-size-for-row: 0.80em; }
+        .task-row.completed .task-name-display, .task-row.completed .task-number { font-size: 0.85em; text-decoration: line-through; color: #888; }
+        .task-row.completed .task-name-display:not(.edit-name-input) { text-decoration: line-through; color: #888; }
+        .task-row input[type="checkbox"] { margin-right: 5px; flex-shrink: 0; }
+        .edit-icon, .action-icon { cursor: pointer; font-size: 1em; opacity: 0.6; flex-shrink: 0; padding: 2px; }
+        .item-actions .edit-icon, .item-actions .action-icon {font-size: 0.9em; }
+        .edit-icon:hover, .action-icon:hover { opacity: 1; }
+        .delete-icon { color: #d9534f; } .add-sub-icon { color: #5cb85c; }
+        .task-number { color: #666; min-width: 35px; text-align: left; flex-shrink: 0; }
+        .task-name-wrapper, .item-name-wrapper { flex-grow: 1; display: flex; align-items: center; }
+        .task-name-display, .item-name-display, .edit-name-input { word-break: break-word; }
+        .edit-name-input { flex-grow: 1; padding: 3px; border: 1px solid #999; border-radius: 2px; font-size: 1em; }
+        .task-points-input { width: 45px; padding: 3px; text-align: right; border: 1px solid #ccc; border-radius: 2px; font-size: 0.9em; flex-shrink: 0; }
+        .inline-edit-buttons button { font-size: 0.9em; padding: 2px 5px; margin-left: 3px; }
+        .save-edit-btn { background-color: #337ab7; } .cancel-edit-btn { background-color: #777; }
+        .sub-task-adder { padding-left: 20px; margin: 5px 0; font-size: 0.9em; }
+        .sub-task-adder input[type="text"] { width: 60%; margin-right: 5px; padding: 5px; } .sub-task-adder input[type="number"] { width: 45px; margin-right: 5px; padding: 5px; } .sub-task-adder button { font-size: 0.9em; padding: 5px 8px; }
+        #pointsWonNotification { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5em; font-weight: bold; color: #28a745; background-color: rgba(255, 255, 255, 0.9); padding: 20px 40px; border-radius: 15px; box-shadow: 0 0 20px rgba(0,128,0,0.5); z-index: 10000; display: none; opacity: 0; text-align: center; border: 2px solid #1e7e34; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;}
+        #animatedModelGif { position: fixed; top: 60%; left: 50%; transform: translate(-50%, -50%); max-width: 250px; max-height: 250px; z-index: 9999; display: none; opacity: 0; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);}
+        .slideUpFadeIn { display: block !important; animation: slideUpFadeInAnim 0.5s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
+        .fadeOut { animation: fadeOutAnim 0.5s ease-out forwards; }
+        @keyframes slideUpFadeInAnim { 0% { opacity: 0; transform: translate(-50%, -40%); } 100% { opacity: 1; transform: translate(-50%, -50%); } }
+        @keyframes fadeOutAnim { 0% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; transform: translate(-50%, -60%); } }
+        #animatedPuppy { position: fixed; left: 20px; bottom: 20px; font-size: 3em; z-index: 9998; opacity: 0; transition: opacity 0.3s ease-in-out; }
+        #animatedPuppy.show { opacity: 1; animation: puppyJump 0.8s ease-out; }
+        @keyframes puppyJump { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-30px) rotate(-5deg); } 50% { transform: translateY(0); } 75% { transform: translateY(-20px) rotate(5deg); } }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <div id="leftPanel">
+            <div class="days-section">
+                <h2>Days</h2>
+                <div class="scrollable-list-container">
+                    <ul class="day-list" id="dayListUL"></ul>
+                </div>
+                <div class="form-section">
+                    <input type="text" id="newDayNameInput" placeholder="New day name...">
+                    <button onclick="addDay()">Add Day</button>
+                </div>
+            </div>
+
+            <div id="templateManagementArea">
+                <h2>Templates</h2>
+                <div class="scrollable-list-container" style="max-height: 200px;"> <!-- Limit template list height -->
+                    <ul class="template-list" id="templateListUL"></ul>
+                </div>
+                <div class="form-section">
+                    <input type="text" id="newTemplateNameInput" placeholder="New template name...">
+                    <button onclick="createNewTemplate()">New Empty Template</button>
+                </div>
+                 <button id="createTemplateFromDayBtn" onclick="createTemplateFromCurrentDay()">Save Current Day as Template</button>
+            </div>
+        </div>
+
+        <div class="app-container">
+            <div class="header-container">
+                <h1 id="currentDayTitle">Tasks</h1>
+                <div class="net-points-display">DAY POINTS: <span id="dayNetPointsValue">0</span></div>
+            </div>
+            <div class="add-top-task-form">
+                <input type="text" id="newTaskNameInput" placeholder="Add new task to current day...">
+                <input type="number" id="newTaskPointsInput" placeholder="Pts" min="0" value="0">
+                <button onclick="addTaskToCurrentDay()">Add Task</button>
+            </div>
+            <div class="task-list-header">
+                Task Name <span style="float:right; margin-right: 90px;">Points</span>
+            </div>
+            <div id="taskListContainer"></div>
+        </div>
+    </div>
+
+    <audio id="winSound" preload="auto"></audio> <audio id="puppySound" preload="auto"></audio> <audio id="clapSound" preload="auto"></audio>
+    <div id="pointsWonNotification"></div> <img id="animatedModelGif" src="model.gif" alt="Celebration GIF"> <div id="animatedPuppy">🐕</div>
+
+    <script>
+        let days = [];
+        let templates = [];
+        let selectedDayId = null;
+        let selectedTemplateIdForEditing = null; // To know which template tasks to show if we implement template editing
+
+        const pencilIcon = '✏️'; const addSubIcon = '➕'; const deleteIcon = '🗑️';
+        const WIN_SOUND_PATH = "win.mp3"; const PUPPY_SOUND_PATH = "Puppy.mp3"; const CLAP_SOUND_PATH = "Clap.mp3";
+
+        // DOM Elements
+        const dayListUL = document.getElementById('dayListUL');
+        const newDayNameInput = document.getElementById('newDayNameInput');
+        const templateListUL = document.getElementById('templateListUL');
+        const newTemplateNameInput = document.getElementById('newTemplateNameInput');
+        const currentDayTitleH1 = document.getElementById('currentDayTitle');
+        const taskListContainerDiv = document.getElementById('taskListContainer');
+        const newTaskNameInput = document.getElementById('newTaskNameInput');
+        const newTaskPointsInput = document.getElementById('newTaskPointsInput');
+        const dayNetPointsValueSpan = document.getElementById('dayNetPointsValue');
+        const winSoundAudioElement = document.getElementById('winSound');
+        const puppySoundAudioElement = document.getElementById('puppySound');
+        const clapSoundAudioElement = document.getElementById('clapSound');
+        const pointsNotificationDiv = document.getElementById('pointsWonNotification');
+        const modelGifImg = document.getElementById('animatedModelGif');
+        const animatedPuppyDiv = document.getElementById('animatedPuppy');
+        let notificationTimeout;
+
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); }
+        function escapeHtml(unsafe) { return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+
+        function saveData() {
+            localStorage.setItem('templatedDayToDoApp', JSON.stringify({ days, templates, selectedDayId }));
+        }
+        function loadData() {
+            const savedData = localStorage.getItem('templatedDayToDoApp');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                days = data.days || [];
+                templates = data.templates || [];
+                selectedDayId = data.selectedDayId || null;
+                days.forEach(day => { if (!day.tasks) day.tasks = []; ensureSubTasksRecursive(day.tasks); });
+                templates.forEach(template => { if (!template.tasks) template.tasks = []; ensureSubTasksRecursive(template.tasks); });
+            }
+            if (days.length === 0) addDay("My First Day", false);
+            if (!selectedDayId && days.length > 0) selectedDayId = days[0].id;
+        }
+        function ensureSubTasksRecursive(taskList) {
+            taskList.forEach(task => {
+                if (!task.subTasks) task.subTasks = [];
+                if (!task.id) task.id = generateId();
+                ensureSubTasksRecursive(task.subTasks);
+            });
+        }
+
+        // --- Day Management ---
+        function addDay(nameOverride = null, doSave = true) {
+            const name = nameOverride || newDayNameInput.value.trim();
+            if (!name) { alert("Day name cannot be empty!"); return; }
+            const newDay = { id: generateId(), name: name, tasks: [] };
+            days.push(newDay);
+            if (!selectedDayId || days.length === 1) selectedDayId = newDay.id;
+            newDayNameInput.value = '';
+            if (doSave) saveData();
+            renderApp();
+            if (!nameOverride && doSave) selectDay(newDay.id);
+        }
+        function selectDay(dayId) { selectedDayId = dayId; if (days.find(d => d.id === dayId)) { saveData(); renderApp(); } }
+        function startEditItemName(itemId, itemType) { // itemType can be 'day' or 'template'
+            const item = itemType === 'day' ? days.find(d => d.id === itemId) : templates.find(t => t.id === itemId);
+            if (!item) return;
+            const nameWrapper = document.getElementById(`${itemType}NameWrapper-${itemId}`);
+            if (!nameWrapper || nameWrapper.querySelector('.edit-name-input')) return;
+            nameWrapper.innerHTML = `<input type="text" class="edit-name-input" value="${escapeHtml(item.name)}" style="font-size:0.9em; padding:4px;"><div class="inline-edit-buttons"><button class="save-edit-btn" onclick="saveEditedItemName('${itemId}', '${itemType}')">Save</button><button class="cancel-edit-btn" onclick="cancelEditItemName('${itemType}')">Cancel</button></div>`;
+            const inputField = nameWrapper.querySelector('input[type="text"]');
+            inputField.focus(); inputField.select();
+            inputField.onkeydown = (event) => { if (event.key === 'Enter') saveEditedItemName(itemId, itemType); if (event.key === 'Escape') cancelEditItemName(itemType); };
+        }
+        function saveEditedItemName(itemId, itemType) {
+            const item = itemType === 'day' ? days.find(d => d.id === itemId) : templates.find(t => t.id === itemId);
+            const wrapper = document.getElementById(`${itemType}NameWrapper-${itemId}`);
+            const inputField = wrapper.querySelector('input[type="text"]');
+            const newName = inputField.value.trim();
+            if (newName && item) item.name = newName;
+            saveData(); renderApp();
+        }
+        function cancelEditItemName(itemType) { renderApp(); } // Re-renders appropriate list
+        function deleteDay(dayId) {
+            if (confirm("Delete this day and all its tasks?")) {
+                days = days.filter(d => d.id !== dayId);
+                if (selectedDayId === dayId) selectedDayId = days.length > 0 ? days[0].id : null;
+                saveData(); renderApp();
+            }
+        }
+
+        // --- Template Management ---
+        function createNewTemplate() {
+            const name = newTemplateNameInput.value.trim();
+            if (!name) { alert("Template name cannot be empty!"); return; }
+            templates.push({ id: generateId(), name: name, tasks: [] }); // Empty tasks for now, or could prompt to copy current day
+            newTemplateNameInput.value = '';
+            saveData(); renderTemplateList();
+        }
+        function createTemplateFromCurrentDay() {
+            const selectedDay = getSelectedDay();
+            if (!selectedDay) { alert("No day selected to create a template from."); return; }
+            const templateName = prompt("Enter name for new template (from " + selectedDay.name + "):", selectedDay.name + " Template");
+            if (!templateName) return;
+            // Deep clone tasks, but don't copy 'completed' status or generate new IDs yet (that happens on apply)
+            const clonedTasks = JSON.parse(JSON.stringify(selectedDay.tasks)).map(task => stripRuntimeState(task));
+            templates.push({ id: generateId(), name: templateName, tasks: clonedTasks });
+            saveData(); renderTemplateList();
+        }
+        function stripRuntimeState(task) { // Remove 'completed' and ensure subtasks are also stripped
+            const { completed, ...restOfTask } = task; // Remove 'completed'
+            if (restOfTask.subTasks && restOfTask.subTasks.length > 0) {
+                restOfTask.subTasks = restOfTask.subTasks.map(sub => stripRuntimeState(sub));
+            }
+            return restOfTask;
+        }
+        function applyTemplateToCurrentDay(templateId) {
+            const selectedDay = getSelectedDay();
+            const template = templates.find(t => t.id === templateId);
+            if (!selectedDay || !template) { alert("Day or Template not found."); return; }
+            if (confirm(`Apply template "${template.name}" to day "${selectedDay.name}"? This will add tasks from the template.`)) {
+                // Deep clone template tasks and generate NEW IDs for them and their subtasks
+                const tasksToApply = JSON.parse(JSON.stringify(template.tasks)).map(task => assignNewIdsRecursive(task));
+                selectedDay.tasks.push(...tasksToApply);
+                saveData(); renderTaskListForSelectedDay(); updateDayNetPoints();
+            }
+        }
+        function assignNewIdsRecursive(task) {
+            task.id = generateId();
+            task.completed = false; // Ensure tasks from template are not completed
+            if (task.subTasks && task.subTasks.length > 0) {
+                task.subTasks = task.subTasks.map(sub => assignNewIdsRecursive(sub));
+            }
+            return task;
+        }
+        function deleteTemplate(templateId) {
+            if (confirm("Delete this template?")) {
+                templates = templates.filter(t => t.id !== templateId);
+                saveData(); renderTemplateList();
+            }
+        }
+
+
+        // --- Task Management (scoped to selectedDayId) ---
+        function getSelectedDay() { return days.find(d => d.id === selectedDayId); }
+        function addTaskToCurrentDay() {
+            const selectedDay = getSelectedDay(); if (!selectedDay) { alert("Please select a day first!"); return; }
+            const name = newTaskNameInput.value.trim(); const points = parseInt(newTaskPointsInput.value) || 0;
+            if (!name) { alert("Task name cannot be empty!"); return; }
+            selectedDay.tasks.push({ id: generateId(), name, points: points < 0 ? 0 : points, completed: false, subTasks: [] });
+            newTaskNameInput.value = ''; newTaskPointsInput.value = '0';
+            saveData(); renderTaskListForSelectedDay(); updateDayNetPoints();
+        }
+        function findTaskInDay(taskId, day) { // Finds task only within a specific day object
+            if (!day || !day.tasks) return null;
+            function findInList(id, taskList) {
+                for (const task of taskList) {
+                    if (task.id === id) return task;
+                    if (task.subTasks) { const found = findInList(id, task.subTasks); if (found) return found; }
+                } return null;
+            } return findInList(taskId, day.tasks);
+        }
+        function promptAddSubTaskToTask(parentTaskId) {
+            const day = getSelectedDay(); const parentTask = findTaskInDay(parentTaskId, day); if (!parentTask) return;
+            const existingAdder = document.getElementById(`subTaskAdder-${parentTaskId}`); if (existingAdder) existingAdder.remove();
+            const adderDiv = document.createElement('div'); adderDiv.classList.add('sub-task-adder'); adderDiv.id = `subTaskAdder-${parentTaskId}`;
+            let depth = 0; function getDepth(id, list, d) { for (const t of list) { if (t.id === id) return d; if (t.subTasks) { const f = getDepth(id, t.subTasks, d + 1); if (f !== -1) return f; } } return -1; }
+            depth = getDepth(parentTaskId, day.tasks, 0);
+            adderDiv.style.marginLeft = (depth + 1) * 20 + 'px';
+            adderDiv.innerHTML = `<input type="text" placeholder="New sub-task..." id="newSubTaskNameInput-${parentTaskId}"><input type="number" placeholder="Pts" min="0" value="0" id="newSubTaskPointsInput-${parentTaskId}"><button onclick="executeAddSubTaskToTask('${parentTaskId}')">Add</button><button onclick="document.getElementById('subTaskAdder-${parentTaskId}').remove()">Cancel</button>`;
+            const parentElement = document.querySelector(`.task-item-container[data-task-id="${parentTaskId}"]`); if (parentElement) { parentElement.insertAdjacentElement('afterend', adderDiv); document.getElementById(`newSubTaskNameInput-${parentTaskId}`).focus(); }
+        }
+        function executeAddSubTaskToTask(parentTaskId) {
+            const day = getSelectedDay(); const parentTask = findTaskInDay(parentTaskId, day); if (!parentTask) return;
+            const nameInput = document.getElementById(`newSubTaskNameInput-${parentTaskId}`); const pointsInput = document.getElementById(`newSubTaskPointsInput-${parentTaskId}`);
+            const name = nameInput.value.trim(); const points = parseInt(pointsInput.value) || 0;
+            if (!name) { alert("Sub-task name empty!"); return; }
+            if (!parentTask.subTasks) parentTask.subTasks = [];
+            parentTask.subTasks.push({ id: generateId(), name, points: points < 0 ? 0 : points, completed: false, subTasks: [] });
+            document.getElementById(`subTaskAdder-${parentTaskId}`).remove();
+            saveData(); renderTaskListForSelectedDay(); updateDayNetPoints();
+        }
+        function toggleComplete(taskId) {
+            const day = getSelectedDay(); const task = findTaskInDay(taskId, day); if (!task) return;
+            task.completed = !task.completed;
+            if (task.completed && task.points > 0) showPointsWonAnimation(task.points);
+            saveData(); renderTaskListForSelectedDay(); updateDayNetPoints();
+        }
+        function deleteTask(taskId) {
+            const day = getSelectedDay(); if (!day) return;
+            function delRecursive(id, taskList) { for (let i = 0; i < taskList.length; i++) { if (taskList[i].id === id) { taskList.splice(i, 1); return true; } if (taskList[i].subTasks && delRecursive(id, taskList[i].subTasks)) return true; } return false; }
+            if (delRecursive(taskId, day.tasks)) { saveData(); renderTaskListForSelectedDay(); updateDayNetPoints(); }
+        }
+        function updateTaskPoints(taskId, newPointsStr) {
+            const day = getSelectedDay(); const task = findTaskInDay(taskId, day); if (!task) return;
+            const newPoints = parseInt(newPointsStr); task.points = (!isNaN(newPoints) && newPoints >= 0) ? newPoints : task.points;
+            saveData(); renderTaskListForSelectedDay(); updateDayNetPoints();
+        }
+        function startEditTaskName(taskId) {
+            const day = getSelectedDay(); const task = findTaskInDay(taskId, day); if (!task) return;
+            const nameWrapper = document.getElementById(`taskNameWrapper-${taskId}`); if (!nameWrapper || nameWrapper.querySelector('.edit-name-input')) return;
+            nameWrapper.innerHTML = `<input type="text" class="edit-name-input" value="${escapeHtml(task.name)}"><div class="inline-edit-buttons"><button class="save-edit-btn" onclick="saveEditedTaskName('${taskId}')">Save</button><button class="cancel-edit-btn" onclick="cancelEditTaskName()">Cancel</button></div>`;
+            const inputField = nameWrapper.querySelector('input[type="text"]'); inputField.focus(); inputField.select();
+            inputField.onkeydown = (event) => { if (event.key === 'Enter') saveEditedTaskName(taskId); if (event.key === 'Escape') cancelEditTaskName(); };
+        }
+        function saveEditedTaskName(taskId) {
+            const day = getSelectedDay(); const task = findTaskInDay(taskId, day);
+            const wrapper = document.getElementById(`taskNameWrapper-${taskId}`); const inputField = wrapper.querySelector('input[type="text"]');
+            const newName = inputField.value.trim(); if (newName && task) task.name = newName;
+            saveData(); renderTaskListForSelectedDay();
+        }
+        function cancelEditTaskName() { renderTaskListForSelectedDay(); }
+
+        // --- Rendering ---
+        function renderApp() {
+            renderDayList();
+            renderTemplateList();
+            renderTaskListForSelectedDay();
+            updateDayNetPoints(); // Now specific to the day
+        }
+        function renderDayList() {
+            dayListUL.innerHTML = '';
+            days.forEach(day => {
+                const li = document.createElement('li'); li.classList.add('list-item', 'day-list-item');
+                if (day.id === selectedDayId) li.classList.add('selected');
+                li.setAttribute('data-day-id', day.id); li.onclick = () => selectDay(day.id);
+                li.innerHTML = `<span class="item-name-wrapper" id="dayNameWrapper-${day.id}"><span class="item-name-display">${escapeHtml(day.name)}</span></span><span class="item-actions"><span class="edit-icon" onclick="event.stopPropagation(); startEditItemName('${day.id}', 'day')" title="Edit day name">${pencilIcon}</span><span class="action-icon delete-icon" onclick="event.stopPropagation(); deleteDay('${day.id}')" title="Delete day">${deleteIcon}</span></span>`;
+                dayListUL.appendChild(li);
+            });
+        }
+        function renderTemplateList() {
+            templateListUL.innerHTML = '';
+            templates.forEach(template => {
+                const li = document.createElement('li'); li.classList.add('list-item', 'template-list-item');
+                li.setAttribute('data-template-id', template.id);
+                // Could add selection styling for templates if we implement direct template editing view
+                li.innerHTML = `<span class="item-name-wrapper" id="templateNameWrapper-${template.id}"><span class="item-name-display">${escapeHtml(template.name)}</span></span><span class="item-actions"><button onclick="event.stopPropagation(); applyTemplateToCurrentDay('${template.id}')">Apply</button><span class="edit-icon" onclick="event.stopPropagation(); startEditItemName('${template.id}', 'template')" title="Edit template name">${pencilIcon}</span><span class="action-icon delete-icon" onclick="event.stopPropagation(); deleteTemplate('${template.id}')" title="Delete template">${deleteIcon}</span></span>`;
+                templateListUL.appendChild(li);
+            });
+        }
+         function renderTaskListForSelectedDay() {
+            taskListContainerDiv.innerHTML = '';
+            const selectedDay = getSelectedDay();
+            if (selectedDay) {
+                currentDayTitleH1.innerHTML = `Tasks for: <span style="color:#337ab7;">${escapeHtml(selectedDay.name)}</span>`;
+                renderTaskItemsRecursive(selectedDay.tasks, taskListContainerDiv, 0, '');
+            } else {
+                currentDayTitleH1.textContent = "No Day Selected";
+                taskListContainerDiv.innerHTML = '<p style="text-align:center; color:#777;">Select or add a day to see tasks.</p>';
+            }
+            updateDayNetPoints(); // Update points whenever tasks for selected day are rendered
+        }
+        function renderTaskItemsRecursive(taskList, parentElement, level, numberPrefix) {
+            taskList.forEach((task, index) => {
+                const itemContainer = document.createElement('div'); itemContainer.classList.add('task-item-container'); itemContainer.setAttribute('data-task-id', task.id);
+                const taskRow = document.createElement('div'); taskRow.classList.add('task-row', `level-${level > 3 ? 3 : level}`);
+                if (task.completed) taskRow.classList.add('completed');
+                taskRow.style.paddingLeft = (level * 20) + 'px';
+                const currentNumber = numberPrefix + (index + 1) + '.';
+                taskRow.innerHTML = `<input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleComplete('${task.id}')" title="Mark complete"><span class="edit-icon" onclick="startEditTaskName('${task.id}')" title="Edit name">${pencilIcon}</span><span class="task-number">${currentNumber}</span><span class="task-name-wrapper" id="taskNameWrapper-${task.id}"><span class="task-name-display">${escapeHtml(task.name)}</span></span><input type="number" class="task-points-input" value="${task.points}" onchange="updateTaskPoints('${task.id}', this.value)" min="0" title="Points"><span class="action-icon add-sub-icon" onclick="promptAddSubTaskToTask('${task.id}')" title="Add sub-task">${addSubIcon}</span><span class="action-icon delete-icon" onclick="deleteTask('${task.id}')" title="Delete task">${deleteIcon}</span>`;
+                itemContainer.appendChild(taskRow); parentElement.appendChild(itemContainer);
+                if (task.subTasks && task.subTasks.length > 0) renderTaskItemsRecursive(task.subTasks, itemContainer, level + 1, currentNumber);
+            });
+        }
+        function updateDayNetPoints() {
+            let dayTotalPoints = 0;
+            const selectedDay = getSelectedDay();
+            if (selectedDay) {
+                function calculateForList(taskList) {
+                    let listTotal = 0;
+                    taskList.forEach(task => {
+                        if (task.completed) listTotal += task.points;
+                        if (task.subTasks) listTotal += calculateForList(task.subTasks);
+                    });
+                    return listTotal;
+                }
+                dayTotalPoints = calculateForList(selectedDay.tasks);
+            }
+            dayNetPointsValueSpan.textContent = dayTotalPoints;
+        }
+
+        // --- Animations & Sounds (Global) --- (Same as before)
+        let animationInProgress = false;
+        function showPointsWonAnimation(pointsAwarded) {
+            if (pointsAwarded <= 0 || animationInProgress) return; animationInProgress = true; clearTimeout(notificationTimeout);
+            pointsNotificationDiv.textContent = `+${pointsAwarded} POINTS!`;
+            playSound(winSoundAudioElement, WIN_SOUND_PATH); playSound(puppySoundAudioElement, PUPPY_SOUND_PATH); playSound(clapSoundAudioElement, CLAP_SOUND_PATH);
+            pointsNotificationDiv.className = ''; void pointsNotificationDiv.offsetWidth; pointsNotificationDiv.classList.add('slideUpFadeIn'); pointsNotificationDiv.style.display = 'block';
+            modelGifImg.className = ''; void modelGifImg.offsetWidth; modelGifImg.classList.add('slideUpFadeIn'); modelGifImg.style.display = 'block';
+            const originalSrc = modelGifImg.src; modelGifImg.src = ''; modelGifImg.src = originalSrc; animatedPuppyDiv.classList.add('show');
+            notificationTimeout = setTimeout(() => {
+                pointsNotificationDiv.classList.remove('slideUpFadeIn'); pointsNotificationDiv.classList.add('fadeOut');
+                modelGifImg.classList.remove('slideUpFadeIn'); modelGifImg.classList.add('fadeOut'); animatedPuppyDiv.classList.remove('show');
+                setTimeout(() => { pointsNotificationDiv.style.display = 'none'; pointsNotificationDiv.classList.remove('fadeOut'); modelGifImg.style.display = 'none'; modelGifImg.classList.remove('fadeOut'); animationInProgress = false; }, 500);
+            }, 2000);
+        }
+        function playSound(audioElement, soundPath) { if (!soundPath) return; try { audioElement.src = soundPath; audioElement.currentTime = 0; audioElement.play().catch(e => console.warn("Audio play failed for:", soundPath, e)); } catch(e) { console.error("Error setting sound source for:", soundPath, e); } }
+
+        window.onload = () => {
+            loadData();
+            if (days.length > 0 && (!selectedDayId || !days.find(d => d.id === selectedDayId))) { selectedDayId = days[0].id; saveData(); }
+            if (days.length > 0 && selectedDayId) {
+                 const dayObj = getSelectedDay();
+                 if(dayObj && dayObj.tasks.length === 0 && templates.length > 0 && templates[0].tasks.length > 0) {
+                     // Optionally auto-apply first template to first day if empty for demo
+                     // applyTemplateToCurrentDay(templates[0].id);
+                 } else if (dayObj && dayObj.tasks.length === 0) { // Add sample task if day is empty and no templates
+                     dayObj.tasks.push({ id: generateId(), name: "Sample Task for " + dayObj.name, points: 5, completed: false, subTasks: [] });
+                     saveData();
+                 }
+            }
+            renderApp();
+        };
+    </script>
+</body>
+</html>
